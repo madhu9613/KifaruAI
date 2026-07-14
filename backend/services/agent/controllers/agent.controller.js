@@ -104,8 +104,20 @@ import axios from "axios";
 import { enqueueMemoryExtraction } from "../queues/memory.queue.js";
 export const chat = async (req, res, next) => {
   try {
+
+    console.log("📥 [Controller] Incoming request");
+    console.log("📥 [Controller] req.file:", req.file);
+    console.log("📥 [Controller] req.body:", req.body);
     const { prompt, conversationId, agent } = req.body;
     const file = req.file;
+    const userId = req.headers["x-user-id"];
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Missing user session. Please sign in again.",
+      });
+    }
 
     // Check if client wants streaming (query param or Accept header)
     const wantsStream = req.query.stream === 'true' ||
@@ -120,7 +132,7 @@ export const chat = async (req, res, next) => {
     });
     console.log(`💾 [Memory] Saved user message for conversation ${conversationId}`);
     enqueueMemoryExtraction(
-      req.headers["x-user-id"],
+      userId,
       prompt,
       conversationId
     ).catch(err => console.error("Memory queue error:", err));
@@ -130,7 +142,7 @@ export const chat = async (req, res, next) => {
       const result = await graph.invoke({
         prompt,
         conversationId,
-        userId: req.headers["x-user-id"],
+        userId,
         agent,
         file,
         streaming: false, // explicitly false
@@ -171,7 +183,7 @@ export const chat = async (req, res, next) => {
     const initialState = {
       prompt,
       conversationId,
-      userId: req.headers["x-user-id"],
+      userId,
       agent,
       file,
       streaming: true, // <-- tells agents to use streaming LLM

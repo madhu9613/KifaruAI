@@ -10,6 +10,17 @@ export const deductCredits = async (
 
     try {
 
+        if (!userId) {
+            const error = new Error("Missing user session.");
+            error.status = 401;
+            error.data = {
+                success: false,
+                title: "Authentication required",
+                message: "Please sign in again to continue."
+            };
+            throw error;
+        }
+
         await axios.patch(
 
             `${process.env.AUTH_SERVICE}/internal/deduct-credits`,
@@ -30,6 +41,17 @@ export const deductCredits = async (
 
         const response =
             error.response?.data;
+
+        if (error.response?.status === 404) {
+            const err = new Error("User not found.");
+            err.status = 401;
+            err.data = {
+                success: false,
+                title: "Authentication required",
+                message: "User session not found. Please sign in again."
+            };
+            throw err;
+        }
 
         const err =
             new Error(

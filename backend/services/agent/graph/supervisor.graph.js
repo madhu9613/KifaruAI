@@ -35,7 +35,7 @@ from "../agents/pdf.agent.js";
 import { pptAgent } from "../agents/ppt.agent.js";
 import { imageAgent } from "../agents/imageGen.agent.js";
 import { visionAgent } from "../agents/vision.agent.js";
-import { pdfRagAgent } from "../agents/pdfRag.agent.js";
+import { knowledgeAgent } from "../agents/knowledge.agent.js";
 
 const workflow =
 new StateGraph(
@@ -81,7 +81,7 @@ workflow.addNode(
 );
 workflow.addNode(
  "pdf_rag",
- pdfRagAgent
+  knowledgeAgent
 );
 workflow.addEdge(
  "__start__",

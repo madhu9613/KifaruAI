@@ -49,13 +49,6 @@ export const getModel = (agent, options = {}) => {
         ...commonParams,
       });
 
-    case "pdf-rag":    // same
-      return new ChatGroq({
-        model: "llama-3.3-70b-versatile",
-        ...commonParams,
-        maxRetries: 2,
-      });
-
     case "memory":     // router should NOT stream – we'll pass streaming: false
       return new ChatGroq({
         model: "llama-3.3-70b-versatile",

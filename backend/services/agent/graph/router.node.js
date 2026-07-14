@@ -1,6 +1,5 @@
 import { getModel } from "../utils/model.js";
 import { getUserMemories } from "../utils/getUserMemories.js";
-import ProcessedFile from "../models/processedFile.model.js";
 
 const VALID_AGENTS = new Set([
     "chat",
@@ -10,7 +9,6 @@ const VALID_AGENTS = new Set([
     "ppt",
     "image",
     "vision",
-    "pdf_rag",
 ]);
 
 const normalizeAgent = (value) => {
@@ -43,10 +41,6 @@ export const routerNode = async (state) => {
             console.log("🔍 [Router] → Routing to vision (forced by file)");
             return { ...state, agent: "vision" };
         }
-        if (state.file.mimetype === "application/pdf") {
-            console.log("🔍 [Router] → Routing to pdf_rag (forced by file)");
-            return { ...state, agent: "pdf_rag" };
-        }
         // For other file types, add more cases
     }
 
@@ -56,27 +50,14 @@ export const routerNode = async (state) => {
         return { ...state, agent: normalizeAgent(state.agent) };
     }
 
-    // ─── 3. CHECK FOR EXISTING PDFs IN CONVERSATION ────────────
-    const processedFiles = await ProcessedFile.find({
-        conversationId: state.conversationId,
-        status: "ready",
-    });
-    const hasKnowledge = processedFiles.length > 0;
-    console.log(`🔍 [Router] Has ready PDFs: ${hasKnowledge} (${processedFiles.length})`);
-
-    // ─── 4. FETCH USER MEMORIES ────────────────────────────────
+    // ─── 3. FETCH USER MEMORIES ────────────────────────────────
     const memories = await getUserMemories(state.userId);
     let memoryContext = "";
     if (memories.length > 0) {
         memoryContext = memories.map(m => `- [${m.category}] ${m.text}`).join("\n");
     }
 
-    // ─── 5. BUILD CONTEXT FOR LLM ──────────────────────────────
-    const docContext = hasKnowledge
-        ? `\n⚠️ This conversation has ${processedFiles.length} uploaded PDF(s). If the query could be answered using these documents, route to "pdf_rag".\n`
-        : "";
-
-    // ─── 6. LLM ROUTER (only if no file and agent is "auto") ──
+    // ─── 4. LLM ROUTER (only if no file and agent is "auto") ──
     const llm = getModel("router");
     const result = await llm.invoke(`
 You are an agent router.
@@ -88,20 +69,16 @@ Available agents:
 - pdf: Generate a PDF (not for querying existing ones).
 - ppt: Generate a presentation.
 - image: Generate an image.
-- pdf_rag: Answer questions using uploaded PDF documents.
-
-${docContext}
 
 User known facts:
 ${memoryContext || "None"}
 
 Rules:
-- If the user asks about content likely in the uploaded PDFs, choose "pdf_rag".
 - If the conversation is general/personal, choose "chat".
 - For code, choose "coding".
 - For web info, choose "search".
 
-Return ONLY one word: chat, search, coding, pdf, ppt, image, or pdf_rag.
+Return ONLY one word: chat, search, coding, pdf, ppt, image, or vision.
 
 User Query:
 ${state.prompt}

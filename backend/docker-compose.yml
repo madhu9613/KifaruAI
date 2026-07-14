@@ -1,10 +1,97 @@
-
-
 services:
   redis:
-    image: redis
+    image: redis:7
     ports:
       - "6379:6379"
 
+  # auth:
+  #   build:
+  #     context: .
+  #     dockerfile: services/auth/Dockerfile
+  #   env_file:
+  #     - ./services/auth/.env
+  #   environment:
+  #     PORT: 8001
+  #     FRONTEND_URL: http://localhost:5173
+  #   ports:
+  #     - "8001:8001"
 
+  # chat:
+  #   build:
+  #     context: .
+  #     dockerfile: services/chat/Dockerfile
+  #   env_file:
+  #     - ./services/chat/.env
+  #   environment:
+  #     PORT: 8002
+  #   ports:
+  #     - "8002:8002"
 
+  # billing:
+  #   build:
+  #     context: .
+  #     dockerfile: services/billing/Dockerfile
+  #   env_file:
+  #     - ./services/billing/.env
+  #   environment:
+  #     PORT: 8004
+  #     AUTH_SERVICE: http://auth:8001
+  #   depends_on:
+  #     - auth
+  #   ports:
+  #     - "8004:8004"
+
+  # rag:
+  #   build:
+  #     context: ./services/rag
+  #   env_file:
+  #     - ./services/rag/.env
+  #   environment:
+  #     PORT: 3000
+  #   ports:
+  #     - "8010:3000"
+
+  # agent:
+  #   build:
+  #     context: .
+  #     dockerfile: services/agent/Dockerfile
+  #   env_file:
+  #     - ./services/agent/.env
+  #   environment:
+  #     PORT: 8003
+  #     REDIS_URL: redis://redis:6379
+  #     CHAT_SERVICE: http://chat:8002
+  #     AUTH_SERVICE: http://auth:8001
+  #     GATEWAY_URL: http://gateway:8000
+  #     RAG_SERVICE_URL: http://rag:3000
+  #   depends_on:
+  #     - redis
+  #     - auth
+  #     - chat
+  #     - rag
+  #   ports:
+  #     - "8003:8003"
+
+  # gateway:
+  #   build:
+  #     context: .
+  #     dockerfile: gateway/Dockerfile
+  #   env_file:
+  #     - ./gateway/.env
+  #   environment:
+  #     PORT: 8000
+  #     REDIS_URL: redis://redis:6379
+  #     AUTH_SERVICE: http://auth:8001
+  #     CHAT_SERVICE: http://chat:8002
+  #     AGENT_SERVICE: http://agent:8003
+  #     BILLING_SERVICE: http://billing:8004
+  #     RAG_SERVICE: http://rag:3000
+  #   depends_on:
+  #     - redis
+  #     - auth
+  #     - chat
+  #     - billing
+  #     - agent
+  #     - rag
+  #   ports:
+  #     - "8000:8000"

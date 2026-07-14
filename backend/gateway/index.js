@@ -28,6 +28,14 @@ app.use("/api/auth",proxy(process.env.AUTH_SERVICE))
 app.use("/api/me",protect,getCurrentUser)
 app.use("/api/chat", protect, proxyWithUser(process.env.CHAT_SERVICE, { bufferResponse: false }));
 app.use(
+  "/api/rag",
+  protect,
+  proxyWithUser(process.env.RAG_SERVICE || "http://localhost:8010", {
+    limit: "50mb",
+    bufferResponse: false,
+  })
+);
+app.use(
   "/api/agent",
   protect,
   proxyWithUser(process.env.AGENT_SERVICE, {

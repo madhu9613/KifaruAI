@@ -4,17 +4,39 @@ import router from "./routes/chat.routes.js";
 import connectDB from "./config/db.js";
 
 dotenv.config();
+
 const app = express();
+const port = process.env.PORT || 8002;
+
 app.use(express.json());
-const port=process.env.PORT
 
 
-app.use("/",router)
-
-
-app.listen(port, () => {
-    connectDB()
-  console.log(
-    `chat service running on ${port}`
-  );
+// Health check endpoint (Render / Docker / Load balancer)
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    service: "chat",
+    timestamp: new Date().toISOString()
+  });
 });
+
+
+app.use("/", router);
+
+
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    app.listen(port, () => {
+      console.log(`Chat service running on port ${port}`);
+    });
+
+  } catch (error) {
+    console.error("Failed to start chat service:", error);
+    process.exit(1);
+  }
+};
+
+
+startServer();

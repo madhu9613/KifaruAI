@@ -13,17 +13,26 @@ dotenv.config();
 const app = express();
 const port=process.env.PORT || 5000
 
-
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
+  "https://kifaru-ai.vercel.app",
   "http://localhost:5173"
 ];
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS blocked"));
+  },
   credentials: true
 }));
-
 app.use(
   "/uploads",
   express.static("uploads")

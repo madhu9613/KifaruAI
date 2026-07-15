@@ -49,7 +49,9 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    DragOverlay,
 } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(false);
@@ -65,6 +67,9 @@ export default function Sidebar() {
     // Modal states
     const [folderModal, setFolderModal] = useState({ open: false, mode: "create", folderId: null, initialName: "" });
     const [confirmModal, setConfirmModal] = useState({ open: false, title: "", message: "", onConfirm: null });
+
+    // Drag overlay state
+    const [activeId, setActiveId] = useState(null);
 
     const { userData } = useSelector((state) => state.user);
     const { folders, selectedConversation } = useSelector((state) => state.conversation);
@@ -228,25 +233,50 @@ export default function Sidebar() {
             const { active, over } = event;
             if (!over) return;
 
+            const conversationId = active.id;
+            let targetFolderId = null;
+
+            // If dropped on a folder container
             if (typeof over.id === "string" && over.id.startsWith("folder-")) {
-                const folderId = over.id.replace("folder-", "");
+                targetFolderId = over.id.replace("folder-", "");
+            }
+            // If dropped on "uncategorized" container
+            else if (over.id === "uncategorized") {
+                targetFolderId = null;
+            }
+            // If dropped on another conversation
+            else {
                 const allConvs = [...uncategorizedConvs, ...realFolders.flatMap((f) => f.conversations || [])];
-                const conv = allConvs.find((c) => c._id === active.id);
-                if (conv && conv.folderId !== folderId) {
-                    await handleMoveConversation(active.id, folderId);
+                const targetConv = allConvs.find((c) => c._id === over.id);
+                if (targetConv) {
+                    targetFolderId = targetConv.folderId; // may be null
                 }
-                return;
             }
 
+            // If we didn't find a valid target, do nothing
+            if (targetFolderId === undefined) return;
+
+            // Find the source conversation
             const allConvs = [...uncategorizedConvs, ...realFolders.flatMap((f) => f.conversations || [])];
-            const targetConv = allConvs.find((c) => c._id === over.id);
-            const sourceConv = allConvs.find((c) => c._id === active.id);
-            if (targetConv && sourceConv && targetConv.folderId !== sourceConv.folderId) {
-                await handleMoveConversation(active.id, targetConv.folderId);
+            const sourceConv = allConvs.find((c) => c._id === conversationId);
+            if (!sourceConv) return;
+
+            // Only move if the folder actually changed
+            if (sourceConv.folderId !== targetFolderId) {
+                await handleMoveConversation(conversationId, targetFolderId);
             }
+            setActiveId(null);
         },
         [handleMoveConversation, uncategorizedConvs, realFolders]
     );
+
+    const handleDragStart = ({ active }) => {
+        setActiveId(active.id);
+    };
+
+    const handleDragCancel = () => {
+        setActiveId(null);
+    };
 
     // ── Render helper for conversation items ──
     const renderConversationItem = useCallback(
@@ -414,7 +444,13 @@ export default function Sidebar() {
                     </div>
 
                     {/* Conversation list with DnD */}
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragCancel={handleDragCancel}
+                    >
                         <div className="flex-1 overflow-y-auto px-2.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             {loading && <div className="text-slate-500 text-sm px-4 py-2">Loading conversations…</div>}
                             {error && <div className="text-red-400 text-sm px-4 py-2">{error}</div>}
@@ -457,6 +493,19 @@ export default function Sidebar() {
                                 renderConversationItem={renderConversationItem}
                             />
                         </div>
+
+                        {/* Drag Overlay */}
+                        <DragOverlay>
+                            {activeId ? (
+                                <div className="px-3 py-2 bg-[#1e2430] rounded-lg shadow-lg border border-white/10 text-sm text-slate-200">
+                                    {(() => {
+                                        const allConvs = [...uncategorizedConvs, ...realFolders.flatMap(f => f.conversations || [])];
+                                        const conv = allConvs.find(c => c._id === activeId);
+                                        return conv ? conv.title : activeId;
+                                    })()}
+                                </div>
+                            ) : null}
+                        </DragOverlay>
                     </DndContext>
 
                     {/* Divider */}

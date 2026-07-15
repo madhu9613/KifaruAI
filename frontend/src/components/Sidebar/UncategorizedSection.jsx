@@ -1,21 +1,31 @@
 import React from "react";
-import { MessageSquare } from "lucide-react";
+import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
-export const UncategorizedSection = ({ conversations, renderConversationItem }) => {
-    if (!conversations?.length) return null;
+export function UncategorizedSection({ conversations, renderConversationItem }) {
+    const { setNodeRef, isOver } = useDroppable({
+        id: "uncategorized",
+    });
+
+    if (conversations.length === 0) return null;
 
     return (
-        <div className="mb-1">
-            <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <MessageSquare size={13} />
-                Chats
+        <div
+            ref={setNodeRef}
+            className={`mt-3 rounded-lg transition-colors duration-150 ${isOver ? "bg-white/5 ring-1 ring-indigo-500/30" : ""
+                }`}
+        >
+            <div className="px-2 py-1 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                Uncategorized
             </div>
-            <div className="ml-1 space-y-0.5">
-                <SortableContext items={conversations.map((c) => c._id)} strategy={verticalListSortingStrategy}>
+            <div className="ml-2 pl-1 border-l border-white/[0.04]">
+                <SortableContext
+                    items={conversations.map((c) => c._id)}
+                    strategy={verticalListSortingStrategy}
+                >
                     {conversations.map((conv) => renderConversationItem(conv))}
                 </SortableContext>
             </div>
         </div>
     );
-};
+}

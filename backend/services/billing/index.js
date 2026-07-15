@@ -34,6 +34,15 @@ app.get("/",(req,res)=>{
 
 });
 
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        status: "healthy",
+        service: "billing",
+        timestamp: new Date().toISOString()
+    });
+});
+
+
 app.listen(port, () => {
     connectDB()
   console.log(

@@ -14,27 +14,511 @@ The system is organized so the frontend talks to one public entrypoint, the gate
 - Keep the frontend simple: it sends chat traffic to the gateway and PDF traffic to the rag flow.
 
 ## High-Level Flow
+# AI SaaS Microservice Architecture
+
+## System Architecture
 
 ```mermaid
 flowchart LR
-  UI[React Frontend] --> GW[Gateway]
-  GW --> AUTH[Auth Service]
-  GW --> CHAT[Chat Service]
-  GW --> AGENT[Agent Service]
-  GW --> BILLING[Billing Service]
-  GW --> RAG[RAG Service]
-  AGENT --> CHAT
-  AGENT --> AUTH
-  AGENT --> RAG
-  AUTH --> MONGO[(MongoDB Atlas)]
-  CHAT --> MONGO
-  BILLING --> MONGO
-  AGENT --> MONGO
-  GW --> REDIS[(Redis)]
-  AGENT --> REDIS
-  RAG --> LOCAL[(FAISS / session storage)]
+    UI[React Frontend] --> GW[API Gateway]
+
+    GW --> AUTH[Auth Service]
+    GW --> CHAT[Chat Service]
+    GW --> AGENT[Agent Service]
+    GW --> BILLING[Billing Service]
+    GW --> RAG[RAG Service]
+
+    AGENT --> CHAT
+    AGENT --> AUTH
+    AGENT --> RAG
+
+    AUTH --> MONGO[(MongoDB Atlas)]
+    CHAT --> MONGO
+    BILLING --> MONGO
+    AGENT --> MONGO
+
+    GW --> REDIS[(Redis Session Store)]
+    AGENT --> REDIS
+
+    RAG --> VECTOR[(FAISS / Qdrant Vector Storage)]
 ```
 
+---
+
+# Request Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant U as React Frontend
+    participant GW as API Gateway
+    participant R as Redis Session Store
+    participant AUTH as Auth Service
+    participant AGENT as Agent Service
+    participant CHAT as Chat Service
+    participant RAG as RAG Service
+
+    U->>GW: POST /api/agent/chat (Cookie + User Prompt)
+
+    GW->>R: GET session using cookie
+    R-->>GW: Session Data (userId)
+
+    GW->>AUTH: GET /internal/user (x-user-id)
+    AUTH-->>GW: User Details (email, plan, credits)
+
+    GW->>AGENT: POST /agent/chat (payload + userId)
+
+    AGENT->>AUTH: Validate User Permissions
+    AUTH-->>AGENT: User Access Details
+
+    AGENT->>RAG: Retrieve Context (if required)
+    RAG-->>AGENT: Relevant Documents / Embeddings
+
+    AGENT->>CHAT: Generate AI Response
+    CHAT-->>AGENT: LLM Response
+
+    AGENT-->>GW: AI Answer Stream
+
+    GW-->>U: Stream Response / JSON Response
+```
+
+---
+
+# High Level System Flow
+
+```text
+                         User
+                          |
+                          |
+                          v
+                +----------------+
+                | React Frontend |
+                +----------------+
+                          |
+                          |
+                          v
+                +----------------+
+                |  API Gateway   |
+                +----------------+
+                          |
+        +-----------------+------------------+
+        |                 |                  |
+        v                 v                  v
+
++--------------+   +--------------+   +--------------+
+| Auth Service |   | Agent Service|   | Billing      |
++--------------+   +--------------+   +--------------+
+        |                 |
+        |                 |
+        v                 |
++--------------+          |
+|  MongoDB     |          |
++--------------+          |
+                          |
+              +-----------+------------+
+              |                        |
+              v                        v
+
+       +-------------+          +-------------+
+       | Chat Service|          | RAG Service |
+       +-------------+          +-------------+
+                                        |
+                                        |
+                                        v
+
+                              +----------------+
+                              | Vector Database|
+                              | FAISS/Qdrant   |
+                              +----------------+
+
+
+                 +----------------+
+                 | Redis Session  |
+                 | Cache/Memory  |
+                 +----------------+
+```
+
+---
+
+# Microservice Responsibilities
+
+| Service | Responsibility |
+|---------|----------------|
+| React Frontend | Chat interface, user interaction, streaming UI |
+| API Gateway | Routing, authentication middleware, rate limiting |
+| Auth Service | Signup, login, sessions, JWT, user management |
+| Agent Service | LangGraph orchestration, agent routing, tool calling |
+| Chat Service | LLM communication and conversation handling |
+| RAG Service | PDF processing, chunking, embeddings, retrieval |
+| Billing Service | Subscription, credits, payments |
+| MongoDB | Users, chats, memories, billing records |
+| Redis | Sessions, caching, temporary state |
+| FAISS/Qdrant | Vector similarity search |
+
+
+---
+
+# LangGraph Multi Agent Architecture
+
+```mermaid
+flowchart TD
+
+    USER[User Query]
+
+    USER --> ROUTER[LangGraph Router]
+
+
+    ROUTER --> CHAT_AGENT[Chat Agent]
+
+    ROUTER --> PDF_AGENT[PDF RAG Agent]
+
+    ROUTER --> SEARCH_AGENT[Search Agent]
+
+    ROUTER --> CODE_AGENT[Coding Agent]
+
+    ROUTER --> IMAGE_AGENT[Image Agent]
+
+
+    PDF_AGENT --> RETRIEVE[Document Retrieval]
+
+    RETRIEVE --> EMBEDDING[Embedding Model]
+
+    EMBEDDING --> VECTOR[(FAISS/Qdrant)]
+
+
+    CHAT_AGENT --> LLM[Large Language Model]
+
+
+    CODE_AGENT --> TOOLS[Developer Tools]
+
+
+    SEARCH_AGENT --> WEB[Web Search API]
+
+
+    IMAGE_AGENT --> IMAGE_MODEL[Image Generation Model]
+
+
+    CHAT_AGENT --> RESPONSE[Final Response]
+
+    PDF_AGENT --> RESPONSE
+
+    SEARCH_AGENT --> RESPONSE
+
+    CODE_AGENT --> RESPONSE
+
+    IMAGE_AGENT --> RESPONSE
+```
+
+---
+
+# RAG Pipeline Architecture
+
+```mermaid
+flowchart LR
+
+    PDF[PDF Document]
+
+    PDF --> LOADER[Document Loader]
+
+    LOADER --> SPLITTER[Recursive Character Text Splitter]
+
+    SPLITTER --> CHUNKS[Text Chunks]
+
+
+    CHUNKS --> EMBEDDING[Embedding Model]
+
+    EMBEDDING --> VECTOR[(Vector Database)]
+
+
+    QUERY[User Question]
+
+    QUERY --> QUERY_EMBED[Query Embedding]
+
+
+    QUERY_EMBED --> SEARCH[Similarity Search]
+
+
+    VECTOR --> SEARCH
+
+
+    SEARCH --> CONTEXT[Relevant Context]
+
+
+    CONTEXT --> LLM[LLM]
+
+    LLM --> ANSWER[Generated Answer]
+```
+
+---
+
+# Agent Execution Flow
+
+```mermaid
+flowchart TD
+
+    USER[User Message]
+
+    USER --> ROUTER[Agent Router]
+
+
+    ROUTER --> CHAT[Conversation Agent]
+
+    ROUTER --> PDF[PDF Agent]
+
+    ROUTER --> SEARCH[Search Agent]
+
+    ROUTER --> CODE[Coding Agent]
+
+    ROUTER --> VISION[Vision Agent]
+
+
+    PDF --> VECTORDB[(Vector Database)]
+
+    VECTORDB --> RETRIEVAL[Context Retrieval]
+
+
+    CHAT --> MEMORY[Memory System]
+
+    MEMORY --> REDIS[(Redis)]
+
+    MEMORY --> MONGO[(MongoDB)]
+
+
+    SEARCH --> INTERNET[Search API]
+
+
+    CODE --> EXECUTOR[Code Tools]
+
+
+    VISION --> IMAGE_MODEL[Vision Model]
+
+
+    CHAT --> LLM[LLM]
+
+    PDF --> LLM
+
+    SEARCH --> LLM
+
+    CODE --> LLM
+
+    VISION --> LLM
+
+
+    LLM --> OUTPUT[Final AI Response]
+```
+
+---
+
+# Memory Architecture
+
+```mermaid
+flowchart LR
+
+    USER[User Conversation]
+
+
+    USER --> AGENT[Agent Service]
+
+
+    AGENT --> MEMORY[Memory Manager]
+
+
+    MEMORY --> SHORT[Short Term Memory]
+
+    MEMORY --> LONG[Long Term Memory]
+
+
+    SHORT --> REDIS[(Redis)]
+
+    LONG --> MONGO[(MongoDB)]
+
+
+    MONGO --> USER_PROFILE[User Preferences]
+
+    MONGO --> CHAT_HISTORY[Conversation History]
+```
+
+---
+
+# Production Deployment Architecture
+
+```mermaid
+flowchart LR
+
+    USERS[Users]
+
+
+    USERS --> CDN[Cloudflare CDN]
+
+
+    CDN --> NGINX[Nginx Load Balancer]
+
+
+    NGINX --> GW1[Gateway Instance 1]
+
+    NGINX --> GW2[Gateway Instance 2]
+
+    NGINX --> GW3[Gateway Instance 3]
+
+
+    GW1 --> SERVICES
+
+    GW2 --> SERVICES
+
+    GW3 --> SERVICES
+
+
+
+    subgraph SERVICES[Backend Microservices]
+
+        AUTH[Auth Service]
+
+        AGENT[Agent Service]
+
+        CHAT[Chat Service]
+
+        RAG[RAG Service]
+
+        BILLING[Billing Service]
+
+    end
+
+
+    SERVICES --> MONGO[(MongoDB Cluster)]
+
+
+    SERVICES --> REDIS[(Redis Cluster)]
+
+
+    RAG --> VECTOR[(Qdrant / FAISS)]
+
+
+    AGENT --> QUEUE[RabbitMQ / Kafka]
+```
+
+---
+
+# Complete AI Chat Platform Architecture
+
+```mermaid
+flowchart TB
+
+
+    USER[User]
+
+
+    USER --> FRONTEND[React + Tailwind Frontend]
+
+
+    FRONTEND --> GATEWAY[API Gateway]
+
+
+    GATEWAY --> AUTH[Authentication Service]
+
+
+    AUTH --> DATABASE[(MongoDB)]
+
+
+    GATEWAY --> AGENT[Agent Service]
+
+
+    AGENT --> LANGGRAPH[LangGraph Orchestrator]
+
+
+    LANGGRAPH --> MEMORY[Memory System]
+
+
+    MEMORY --> REDIS[(Redis)]
+
+    MEMORY --> DATABASE
+
+
+
+    LANGGRAPH --> AGENTS
+
+
+
+    subgraph AGENTS[Specialized AI Agents]
+
+        CHAT[Chat Agent]
+
+        RAG[RAG Agent]
+
+        SEARCH[Search Agent]
+
+        CODE[Coding Agent]
+
+        IMAGE[Image Agent]
+
+        VISION[Vision Agent]
+
+    end
+
+
+
+    RAG --> VECTOR[(Vector Database)]
+
+
+    AGENTS --> LLM[LLM Provider]
+
+
+    LLM --> RESPONSE[AI Response]
+
+
+    RESPONSE --> FRONTEND
+```
+
+---
+
+# Final Production Flow
+
+```text
+User
+ |
+ v
+React Frontend
+ |
+ v
+API Gateway
+ |
+ +-----------------------------+
+ |                             |
+ v                             v
+Auth Service              Agent Service
+ |                             |
+ v                             |
+MongoDB                       |
+                               |
+                    +----------+----------+
+                    |                     |
+                    v                     v
+              LangGraph Router       Memory System
+                    |                     |
+                    |                     |
+          +---------+---------+          |
+          |         |         |          |
+          v         v         v          v
+
+       Chat     RAG Agent   Search    Redis/Mongo
+
+          |         |
+          |         |
+          v         v
+
+       LLM      Vector DB
+
+
+                    |
+                    v
+
+              Final Response
+
+                    |
+                    v
+
+             React Frontend
+```
 ## Frontend
 
 The frontend is a Vite + React app. It renders the chat shell, conversation sidebar, message list, message composer, and model/agent controls. The frontend does not directly talk to most backend services. Instead, it uses the gateway as the public backend entrypoint.

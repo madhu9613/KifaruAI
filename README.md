@@ -1,4 +1,4 @@
-```markdown
+
 # Kifaru AI – System Overview
 
 **Executive Summary:** Kifaru is a modular AI platform integrating chat, coding, search, and PDF QA.  We split functionality into dedicated microservices (Auth, Chat, Agent, Billing, and a FastAPI RAG service) behind a Node.js Gateway.  The Gateway handles authentication (via Redis-backed sessions) and proxies requests to internal services.  For AI orchestration we use [LangChain](https://docs.langchain.com) and [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview) (LangGraph is a “low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents”).  Our RAG (Retrieval-Augmented Generation) flow uses PDF ingestion, vector search (FAISS), and LLM answer generation (enhancing accuracy by retrieving external knowledge).  We emphasize clear boundaries, secure design, and full observability.
